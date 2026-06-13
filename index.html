@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tarjimon</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    h1 { font-size: 30px; font-weight: 800; color: #fff; }
+    .subtitle { color: #718096; margin-top: 8px; font-size: 14px; }
+    .header { text-align: center; margin-bottom: 32px; }
+    .card {
+      width: 100%;
+      max-width: 620px;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    textarea {
+      width: 100%;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: #f1f5f9;
+      font-size: 16px;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      line-height: 1.6;
+      transition: border 0.2s;
+    }
+    textarea:focus { border-color: rgba(129,140,248,0.6); }
+    textarea::placeholder { color: #4a5568; }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 10px 0;
+      min-height: 28px;
+    }
+    .lang-badge {
+      font-size: 13px;
+      color: #818cf8;
+      background: rgba(129,140,248,0.1);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(129,140,248,0.2);
+    }
+    .hint { font-size: 12px; color: #4a5568; }
+    button#translateBtn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(79,70,229,0.4);
+      transition: all 0.2s;
+    }
+    button#translateBtn:disabled {
+      background: rgba(79,70,229,0.25);
+      color: #6366f1;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    .output {
+      margin-top: 16px;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(52,211,153,0.2);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: #f1f5f9;
+      font-size: 16px;
+      line-height: 1.7;
+      position: relative;
+      display: none;
+    }
+    .output.error { border-color: rgba(239,68,68,0.3); color: #fca5a5; }
+    .copy-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      color: #a0aec0;
+      cursor: pointer;
+      padding: 3px 10px;
+      font-size: 12px;
+    }
+    .footer { color: #2d3748; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🌐 Tarjimon</h1>
+    <p class="subtitle">Matn yuboring — til avtomatik aniqlanadi</p>
+  </div>
+
+  <div class="card">
+    <textarea id="inputText" rows="5" placeholder="O'zbek yoki turk tilida yozing..."></textarea>
+
+    <div class="meta">
+      <span class="lang-badge" id="langBadge" style="display:none"></span>
+      <span class="hint">Ctrl+Enter = tarjima</span>
+    </div>
+
+    <button id="translateBtn" onclick="translate()">Tarjima qilish →</button>
+
+    <div class="output" id="output">
+      <span id="outputText"></span>
+      <button class="copy-btn" onclick="copyText()">📋</button>
+    </div>
+  </div>
+
+  <p class="footer">Claude AI · Anthropic</p>
+
+  <script>
+    const API_KEY = "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";
+
+    document.getElementById("inputText").addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) translate();
+    });
+
+    async function translate() {
+      const input = document.getElementById("inputText").value.trim();
+      if (!input) return;
+
+      const btn = document.getElementById("translateBtn");
+      const output = document.getElementById("output");
+      const outputText = document.getElementById("outputText");
+      const langBadge = document.getElementById("langBadge");
+
+      btn.disabled = true;
+      btn.textContent = "⏳ Tarjima qilinmoqda...";
+      output.style.display = "none";
+      output.className = "output";
+      langBadge.style.display = "none";
+
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": API_KEY,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true"
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            system: "Sen o'zbek va turk tillarida professional tarjimonsan. Foydalanuvchi matn yuboradi — tilini aniqla (o'zbek yoki turk), so'ng boshqa tilga tabiiy va ravon tarjima qil. Faqat JSON formatida javob ber: {\"detected\": \"uz\" yoki \"tr\", \"translation\": \"tarjima matni\"}",
+            messages: [{ role: "user", content: input }]
+          })
+        });
+
+        const data = await res.json();
+        const raw = data.content.map(b => b.text || "").join("");
+        const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+
+        langBadge.textContent = parsed.detected === "uz"
+          ? "O'zbekcha 🇺🇿 → Türkçe 🇹🇷"
+          : "Türkçe 🇹🇷 → O'zbekcha 🇺🇿";
+        langBadge.style.display = "inline";
+
+        outputText.textContent = parsed.translation;
+        output.style.display = "block";
+      } catch (e) {
+        output.className = "output error";
+        outputText.textContent = "⚠️ Xatolik yuz berdi, qayta urinib ko'ring.";
+        output.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Tarjima qilish →";
+      }
+    }
+
+    function copyText() {
+      const text = document.getElementById("outputText").textContent;
+      navigator.clipboard.writeText(text);
+    }
+  </script>
+</body>
+</html>
